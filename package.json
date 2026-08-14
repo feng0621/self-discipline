@@ -9,18 +9,25 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "build:vercel": "vinext build && node scripts/vercel-build.mjs",
+    "build:android-web": "node scripts/build-android.mjs",
+    "android:sync": "pnpm run build:android-web && cap sync android",
+    "android:apk": "pnpm run android:sync && cd android && gradlew.bat assembleDebug",
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern android --ignore-pattern ios",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.0",
     "@supabase/supabase-js": "^2.112.3",
     "drizzle-orm": "0.45.2",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@cloudflare/vite-plugin": "1.37.1",
     "@eslint/js": "9.39.4",
     "@next/eslint-plugin-next": "16.2.6",

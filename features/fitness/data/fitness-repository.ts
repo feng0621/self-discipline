@@ -1,5 +1,6 @@
 import { supabase } from "../../../infrastructure/supabase/client";
 import type { ReadinessInput, ReadinessRecommendation } from "../domain/adaptive-training";
+import type { TrainingProfile } from "../domain/personalized-plan";
 
 export type BodyHistoryPoint = { date:string; weight:number; waist?:number };
 export type NotificationPreference = { enabled:boolean; days:number[]; time:string; advanceMinutes:number };
@@ -26,6 +27,7 @@ export type DashboardSnapshot = {
   healthLimitations: string[];
   preferences: AppPreferences;
   goal?: string;
+  trainingProfile?: TrainingProfile;
 };
 
 type CompletedExercise = { name:string; sets:number; dose:string; rest:number; actualReps?:number; weightKg?:number; rir?:number };
@@ -57,7 +59,7 @@ export async function loadDashboard(userId: string): Promise<DashboardSnapshot> 
   const weekStart=new Date(`${today}T00:00:00+08:00`);
   weekStart.setDate(weekStart.getDate()-((weekStart.getDay()+6)%7));
   const [{data:profile,error:profileError},{data:body,error:bodyError},{data:activities,error:activitiesError},{data:history,error:historyError},{data:sessions,error:sessionsError},{data:progress,error:progressError},{data:checkin,error:checkinError},{data:notifications,error:notificationError}] = await Promise.all([
-    supabase.from("profiles").select("current_weight_kg,equipment,reminder_enabled,health_limitations,preferences,goal").eq("id",userId).maybeSingle(),
+    supabase.from("profiles").select("current_weight_kg,equipment,reminder_enabled,health_limitations,preferences,goal,training_profile").eq("id",userId).maybeSingle(),
     supabase.from("body_logs").select("weight_kg,waist_cm,sleep_hours,water_cups").eq("user_id",userId).eq("logged_on",today).maybeSingle(),
     supabase.from("extra_activities").select("id,activity_name,amount,effort,completed_at").eq("user_id",userId).order("completed_at",{ascending:false}).limit(20),
     supabase.from("body_logs").select("logged_on,weight_kg,waist_cm").eq("user_id",userId).not("weight_kg","is",null).order("logged_on",{ascending:true}).limit(56),
@@ -97,6 +99,7 @@ export async function loadDashboard(userId: string): Promise<DashboardSnapshot> 
     healthLimitations:profile?.health_limitations??[],
     preferences:{unit:"metric",keepAwake:true,sound:true,vibration:true,...(profile?.preferences as Partial<AppPreferences>|null)},
     goal:profile?.goal??undefined,
+    trainingProfile:(profile?.training_profile as TrainingProfile|null)??undefined,
   };
 }
 
@@ -151,6 +154,17 @@ export async function saveUserPreferences(userId:string,input:{healthLimitations
 export async function saveTrainingGoal(userId:string,goal:string) {
   const {error}=await supabase.from("profiles").update({goal}).eq("id",userId);
   if(error)throw error;
+}
+
+export async function saveTrainingProfile(userId:string,trainingProfile:TrainingProfile) {
+  const {error}=await supabase.from("profiles").update({training_profile:trainingProfile,goal:trainingProfile.primaryGoal}).eq("id",userId);
+  if(error)throw error;
+}
+
+export async function loadTrainingProfile(userId:string) {
+  const {data,error}=await supabase.from("profiles").select("training_profile").eq("id",userId).maybeSingle();
+  if(error)throw error;
+  return (data?.training_profile as TrainingProfile|null)??undefined;
 }
 
 export async function deleteBodyLog(userId:string,date:string) {

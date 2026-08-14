@@ -42,7 +42,7 @@ export default defineConfig(async () => {
 
   // Vercel serves the generated static client. Cloudflare bindings are only
   // needed for local/Workers builds and include platform-specific binaries.
-  const cloudflarePlugins = process.env.VERCEL
+  const cloudflarePlugins = process.env.VERCEL || process.env.CAPACITOR
     ? []
     : [
         (await import("@cloudflare/vite-plugin")).cloudflare({

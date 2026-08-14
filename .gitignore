@@ -42,3 +42,7 @@ yarn-error.log*
 /work/
 *.tsbuildinfo
 /.openai/
+/android/
+/ios/
+/*.apk
+/*-ios-xcode.zip

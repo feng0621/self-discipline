@@ -4,11 +4,14 @@
   "description": "每日状态驱动的自适应健身计划",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "scope": "/",
+  "orientation": "portrait-primary",
   "background_color": "#070a18",
   "theme_color": "#10152d",
   "lang": "zh-CN",
   "icons": [
-    {"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+    {"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}
   ]
 }
-
