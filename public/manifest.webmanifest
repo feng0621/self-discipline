@@ -1,0 +1,14 @@
+{
+  "name": "FORMA 自律健身",
+  "short_name": "FORMA",
+  "description": "每日状态驱动的自适应健身计划",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070a18",
+  "theme_color": "#10152d",
+  "lang": "zh-CN",
+  "icons": [
+    {"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
+
