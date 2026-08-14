@@ -26,6 +26,8 @@
 
 项目采用 Feature Slice 分层：路由入口位于 `app/`，认证和健身产品模块位于 `features/`，Supabase 客户端位于 `infrastructure/`，跨功能 PWA 能力位于 `shared/`。数据库访问统一经过 Fitness Repository，自适应训练规则保持为无框架依赖的纯领域函数。完整说明见 `ARCHITECTURE.md`。
 
+视觉系统采用 Quiet Orbit 方向：高级编辑感、训练仪器精度与克制的动态轨道。设计令牌、原创图标和动效规范见 `DESIGN_SYSTEM.md`。
+
 ## 本地运行
 
 复制环境变量：

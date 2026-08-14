@@ -4,8 +4,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import AuthPanel from "../auth/components/AuthPanel";
+import LandingPage from "../landing/LandingPage";
 import ReadinessCard from "./components/ReadinessCard";
 import Starfield from "./components/Starfield";
+import FormaIcon from "../../shared/icons/FormaIcon";
 import type { ReadinessInput, ReadinessRecommendation } from "./domain/adaptive-training";
 import { exercises, quickStages } from "./domain/workout-catalog";
 import { loadDashboard, saveBodyAndProfile, saveCompletedWorkout, saveDailyReadiness, saveExtraActivity } from "./data/fitness-repository";
@@ -14,7 +16,8 @@ import { supabase } from "../../infrastructure/supabase/client";
 export default function FitnessApp(){
   const [user,setUser]=useState<User|null>(null);
   const [authReady,setAuthReady]=useState(true);
-  const [demoMode,setDemoMode]=useState(true);
+  const [demoMode,setDemoMode]=useState(false);
+  const [showLanding,setShowLanding]=useState(true);
   const [cloudState,setCloudState]=useState<"idle"|"saving"|"synced"|"error">("idle");
   const [done,setDone]=useState<number[]>([]);
   const [guide,setGuide]=useState<number|null>(null);
@@ -82,7 +85,8 @@ export default function FitnessApp(){
   const dayPlan=hour<10?{greeting:"早上好，",title:"先唤醒身体。",name:"8 分钟晨练",detail:"低冲击唤醒 · 5 个环节 · 无器械",action:startQuick}:hour<17?{greeting:"下午好，",title:"练一轮力量。",name:"全身力量 A",detail:"5 个动作 · 约 42 分钟 · 组间休息 45—75 秒",action:startWorkout}:hour<22?{greeting:"晚上好，",title:"今天练全身。",name:"全身力量 A",detail:"5 个动作 · 约 42 分钟 · 每组保留 2 次余力",action:startWorkout}:{greeting:"夜深了，",title:"做舒缓恢复。",name:"睡前恢复",detail:"呼吸与拉伸 · 8 分钟 · 不做高强度训练",action:startQuick};
 
   if(!authReady)return <main className="bootScreen"><span>FORMA°</span><i/></main>;
-  if(!user&&!demoMode)return <><Starfield/><AuthPanel onContinueDemo={()=>setDemoMode(true)}/></>;
+  if(!user&&!demoMode&&showLanding)return <LandingPage onEnterDemo={()=>setDemoMode(true)} onLogin={()=>setShowLanding(false)}/>;
+  if(!user&&!demoMode)return <><Starfield/><AuthPanel onContinueDemo={()=>setDemoMode(true)} onBack={()=>setShowLanding(true)}/></>;
 
   return <main className="app">
     <Starfield intensity={intensity==="强化"?1.4:1}/>
@@ -92,7 +96,7 @@ export default function FitnessApp(){
       <button className="wordmark">FORMA<span>°</span></button>
       <div className="navCenter"><b>W02</b><span>十二周重塑计划</span></div>
       <div className="cloudStatus" data-state={cloudState}><i/>{user?(cloudState==="saving"?"同步中":cloudState==="error"?"同步失败":"云端已连接"):"演示模式"}</div>
-      <button className="profile" onClick={()=>user?void supabase.auth.signOut():setDemoMode(false)} aria-label={user?"退出登录":"进入登录"}>{user?.email?.[0]?.toUpperCase()??"J"}</button>
+      <button className="profile" onClick={()=>user?void supabase.auth.signOut():(setDemoMode(false),setShowLanding(false))} aria-label={user?"退出登录":"进入登录"}>{user?.email?.[0]?.toUpperCase()??"J"}</button>
     </header>
 
     <nav className="desktopTabs">{["训练","计划","记录","我的"].map(x=><button key={x} onClick={()=>setTab(x)} className={tab===x?"active":""}>{x}<span>↗</span></button>)}</nav>
@@ -121,7 +125,7 @@ export default function FitnessApp(){
     </section>
 
     <section className="smartDeck">
-      <article className="adaptCard"><div className="adaptIcon">◎</div><div><p className="kicker">SMART ADAPTATION</p><h3>已按你的器材调整</h3><p>{equipment.join(" · ") || "徒手"} · 低冲击 · 约 42 分钟</p></div><button onClick={()=>setTab("我的")}>调整器材</button></article>
+      <article className="adaptCard"><div className="adaptIcon"><FormaIcon name="adaptive"/></div><div><p className="kicker">SMART ADAPTATION</p><h3>已按你的器材调整</h3><p>{equipment.join(" · ") || "徒手"} · 低冲击 · 约 42 分钟</p></div><button onClick={()=>setTab("我的")}>调整器材</button></article>
       <article className="quickCard"><div><span>08:00</span><p className="kicker">MORNING EXPRESS</p><h3>起床就练，唤醒全身</h3><p>深蹲 · 墙壁俯卧撑 · 原地快走 · 死虫式</p></div><button onClick={startQuick}>开始晨练 <b>→</b></button></article>
     </section>
 
@@ -183,7 +187,7 @@ export default function FitnessApp(){
     </section>}
     </div>
 
-    <nav className="mobileNav" data-index={["训练","计划","记录","我的"].indexOf(tab)} aria-label="主要导航">{["训练","计划","记录","我的"].map((x,i)=><button key={x} aria-current={tab===x?"page":undefined} onClick={()=>setTab(x)} className={tab===x?"active":""}><b>{["⌂","▦","⌁","◎"][i]}</b><span>{x}</span></button>)}</nav>
+    <nav className="mobileNav" data-index={["训练","计划","记录","我的"].indexOf(tab)} aria-label="主要导航">{["训练","计划","记录","我的"].map((x,i)=><button key={x} aria-current={tab===x?"page":undefined} onClick={()=>setTab(x)} className={tab===x?"active":""}><b><FormaIcon name={(["training","plan","record","profile"] as const)[i]}/></b><span>{x}</span></button>)}</nav>
     {notice&&<div className="toast">{notice}<span>✓</span></div>}
 
     {feedback&&<div className="feedback"><div><p className="kicker">SESSION COMPLETE</p><h3>今天的强度怎么样？</h3></div>{["太轻松","正合适","太难"].map(x=><button className={feedback===x?"active":""} onClick={()=>{setFeedback(x);flash(`已记录：${x}，下次计划会自动调整`)}} key={x}>{x}</button>)}<button className="feedbackClose" onClick={()=>setFeedback("")}>×</button></div>}

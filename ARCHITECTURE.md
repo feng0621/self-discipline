@@ -17,6 +17,7 @@ Architecture pattern: **Feature Slice with domain and repository boundaries**.
 app/                         Next/Vinext route and global styles
 features/
   auth/                      Authentication UI
+  landing/                   Public narrative and entrance animation
   fitness/
     FitnessApp.tsx           Client application composition
     components/              Fitness-specific interactive UI
@@ -25,6 +26,7 @@ features/
 infrastructure/
   supabase/                  Supabase client configuration
 shared/
+  icons/                     Original FORMA SVG icon system
   pwa/                       Cross-feature PWA behavior
 supabase/migrations/         Versioned database contract
 tests/                       Rendering and domain regression tests
