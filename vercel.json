@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "pnpm run build:vercel",
+  "outputDirectory": "dist/client",
+  "rewrites": [
+    { "source": "/((?!_next/|favicon.svg|manifest.webmanifest|sw.js).*)", "destination": "/index.html" }
+  ]
+}

@@ -6,4 +6,11 @@ self.addEventListener("fetch",event=>{
   if(event.request.method!=="GET"||new URL(event.request.url).origin!==self.location.origin)return;
   event.respondWith(fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response}).catch(()=>caches.match(event.request).then(response=>response||caches.match("/"))));
 });
-
+self.addEventListener("notificationclick",event=>{
+  event.notification.close();
+  event.waitUntil(clients.matchAll({type:"window",includeUncontrolled:true}).then(windows=>{
+    const existing=windows[0];
+    if(existing){existing.postMessage({type:"OPEN_TODAY_WORKOUT"});return existing.focus()}
+    return clients.openWindow("/?start=training");
+  }));
+});
