@@ -27,16 +27,20 @@ test("server-renders the FORMA fitness app", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
 
-test("keeps the finished app free of starter preview code", async () => {
-  const [page, layout, packageJson] = await Promise.all([
+test("keeps the routed fitness feature free of starter preview code", async () => {
+  const [page, fitnessApp, layout, packageJson, architecture] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../features/fitness/FitnessApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../ARCHITECTURE.md", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /FORMA/);
+  assert.match(page, /FitnessApp/);
+  assert.match(fitnessApp, /FORMA/);
   assert.match(layout, /12 周腹肌计划/);
-  assert.doesNotMatch(page, /SkeletonPreview|codex-preview/);
+  assert.match(architecture, /Feature Slice/);
+  assert.doesNotMatch(page + fitnessApp, /SkeletonPreview|codex-preview/);
   assert.doesNotMatch(layout, /Starter Project|codex-preview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import PwaRegister from "../components/PwaRegister";
+import PwaRegister from "../shared/pwa/PwaRegister";
 
 export const metadata: Metadata = {
   title: "FORMA｜12 周腹肌计划",

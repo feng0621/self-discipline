@@ -22,6 +22,10 @@
 - Supabase Auth、Postgres、RLS、Storage
 - 原生 Canvas 动画与 CSS 动效
 
+## 架构
+
+项目采用 Feature Slice 分层：路由入口位于 `app/`，认证和健身产品模块位于 `features/`，Supabase 客户端位于 `infrastructure/`，跨功能 PWA 能力位于 `shared/`。数据库访问统一经过 Fitness Repository，自适应训练规则保持为无框架依赖的纯领域函数。完整说明见 `ARCHITECTURE.md`。
+
 ## 本地运行
 
 复制环境变量：

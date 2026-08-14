@@ -1,6 +1,6 @@
 "use client";
 import {useState} from "react";
-import {calculateReadiness,ReadinessRecommendation} from "../lib/adaptive-training";
+import {calculateReadiness,ReadinessRecommendation} from "../domain/adaptive-training";
 export default function ReadinessCard({onSave}:{onSave:(input:{sleepHours:number;energy:number;soreness:number;mood:number;availableMinutes:number;soreAreas:string[]},result:ReadinessRecommendation)=>Promise<void>|void}){
   const[expanded,setExpanded]=useState(false),[sleepHours,setSleepHours]=useState(7.5),[energy,setEnergy]=useState(4),[soreness,setSoreness]=useState(2),[mood,setMood]=useState(4),[availableMinutes,setAvailableMinutes]=useState(30),[soreAreas,setSoreAreas]=useState<string[]>([]),[saved,setSaved]=useState(false);
   const input={sleepHours,energy,soreness,mood,availableMinutes,soreAreas},result=calculateReadiness(input);
