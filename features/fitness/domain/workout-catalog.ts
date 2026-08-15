@@ -6,6 +6,8 @@ export const exercises: Exercise[] = [
   { name:"弹力带划船", en:"BAND ROW", target:"背 · 手臂", dose:"4 × 12", sets:4, rest:60, videoId:"WkNuYbWZ8g8", provider:"Whats Up Dude", cue:"胸口保持打开，肘部贴近身体向后拉。", avoid:"耸肩、含胸或身体后仰借力" },
   { name:"臀桥", en:"GLUTE BRIDGE", target:"臀 · 腿后侧", dose:"3 × 18", sets:3, rest:60, videoId:"SKOMwg1JLrU", provider:"NASM", cue:"脚跟发力抬髋，在最高点主动收紧臀部。", avoid:"用腰硬顶或把肋骨过度抬起" },
   { name:"前臂平板支撑", en:"FOREARM PLANK", target:"腹部 · 核心", dose:"3 × 30秒", sets:3, rest:45, videoId:"Vdcy7VrRluA", provider:"ACE Fitness", cue:"收紧腹部与臀部，同时保持均匀呼吸。", avoid:"屏住呼吸、塌腰或臀部抬得过高" },
+  { name:"死虫式", en:"DEAD BUG", target:"深层腹肌 · 核心稳定", dose:"3 × 10/侧", sets:3, rest:45, videoId:"4XLEnwUr1d8", provider:"NASM", cue:"腰背贴地，呼气时缓慢伸展对侧手脚。", avoid:"腰部离地或动作过快" },
+  { name:"反向卷腹", en:"REVERSE CRUNCH", target:"腹直肌 · 下腹控制", dose:"3 × 12", sets:3, rest:45, videoId:"hyv14e2QDq0", provider:"ACE Fitness", cue:"骨盆向肋骨方向卷起，缓慢控制回落。", avoid:"摆腿借力或颈部紧张" },
 ];
 
 export const quickStages = [
@@ -15,4 +17,3 @@ export const quickStages = [
   {name:"原地快走",detail:"保持能说短句的速度",duration:120},
   {name:"死虫式",detail:"慢呼吸，腰背贴地",duration:60},
 ] as const;
-
