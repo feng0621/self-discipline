@@ -14,16 +14,15 @@ async function render() {
   );
 }
 
-test("server-renders the FORMA animated landing page", async () => {
+test("server-renders the FORMA session recovery screen", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /<title>FORMA｜12 周腹肌计划<\/title>/i);
-  assert.match(html, /训练，/);
-  assert.match(html, /应该回应/);
-  assert.match(html, /进入今日训练/);
+  assert.match(html, /bootScreen/);
+  assert.match(html, /FORMA°/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
 

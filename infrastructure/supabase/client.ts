@@ -8,6 +8,12 @@ export const isSupabaseConfigured = Boolean(url && key);
 export const supabase = createClient(
   url ?? "https://example.supabase.co",
   key ?? "public-anon-key",
-  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } },
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: "pkce",
+    },
+  },
 );
-

@@ -30,6 +30,10 @@ export type DashboardSnapshot = {
   trainingProfile?: TrainingProfile;
 };
 
+const dashboardCacheKey=(userId:string)=>`forma-dashboard-${userId}-v1`;
+const readDashboardCache=(userId:string):DashboardSnapshot|undefined=>{try{const raw=localStorage.getItem(dashboardCacheKey(userId));return raw?JSON.parse(raw) as DashboardSnapshot:undefined}catch{return undefined}};
+const writeDashboardCache=(userId:string,snapshot:DashboardSnapshot)=>{try{localStorage.setItem(dashboardCacheKey(userId),JSON.stringify(snapshot))}catch{/* Storage can be unavailable in private mode. */}};
+
 type CompletedExercise = { name:string; sets:number; dose:string; rest:number; actualReps?:number; weightKg?:number; rir?:number };
 
 const localDate = (value:Date|string=new Date()) => {
@@ -69,7 +73,7 @@ export async function loadDashboard(userId: string): Promise<DashboardSnapshot> 
     supabase.from("notification_preferences").select("enabled,training_days,training_time,advance_minutes").eq("user_id",userId).maybeSingle(),
   ]);
   const error=profileError??bodyError??activitiesError??historyError??sessionsError??progressError??checkinError??notificationError;
-  if(error)throw error;
+  if(error){const cached=readDashboardCache(userId);if(cached)return cached;throw error}
   const sessionDates=(sessions??[]).map(item=>localDate(item.completed_at));
   const derivedStreak=calculateStreak(sessionDates);
   const recommendation=checkin?.recommendation as ReadinessRecommendation|undefined;
@@ -78,7 +82,7 @@ export async function loadDashboard(userId: string): Promise<DashboardSnapshot> 
   const lastLevel=Math.max(0,levels.indexOf(lastSession?.intensity as typeof levels[number]));
   const daysSinceLast=lastSession?Math.floor((Date.now()-new Date(lastSession.completed_at).getTime())/86400000):0;
   const recommendedLevel=daysSinceLast>=14?Math.max(0,lastLevel-1):lastSession?.difficulty==="太难"?Math.max(0,lastLevel-1):lastSession?.difficulty==="太轻松"?Math.min(2,lastLevel+1):lastLevel;
-  return {
+  const snapshot:DashboardSnapshot = {
     weight:body?.weight_kg??profile?.current_weight_kg??undefined,
     waist:body?.waist_cm??undefined,
     sleep:body?.sleep_hours??undefined,
@@ -101,14 +105,15 @@ export async function loadDashboard(userId: string): Promise<DashboardSnapshot> 
     goal:profile?.goal??undefined,
     trainingProfile:(profile?.training_profile as TrainingProfile|null)??undefined,
   };
+  writeDashboardCache(userId,snapshot);
+  return snapshot;
 }
 
 export async function saveCompletedWorkout(userId:string,intensity:string,exercises:CompletedExercise[]) {
   const duration=exercises.reduce((sum,item)=>sum+item.sets*45+item.rest*(item.sets-1),0);
-  if(typeof navigator!=="undefined"&&!navigator.onLine)return enqueueSync({kind:"workout",userId,payload:{intensity,duration,exercises,difficulty:"正合适",completedOn:localDate()}});
-  const {data,error}=await supabase.rpc("complete_workout",{p_intensity:intensity,p_duration_seconds:duration,p_exercises:exercises.map(item=>({name:item.name,sets:item.sets,dose:item.dose,actual_reps:item.actualReps,weight_kg:item.weightKg,rir:item.rir})),p_difficulty:"正合适",p_completed_on:localDate()});
-  if(error||!data)throw error??new Error("Workout session was not created");
-  return data as string;
+  const payload={intensity,duration,exercises,difficulty:"正合适",completedOn:localDate()};
+  if(typeof navigator!=="undefined"&&!navigator.onLine)return enqueueSync({kind:"workout",userId,payload});
+  try{const {data,error}=await supabase.rpc("complete_workout",{p_intensity:intensity,p_duration_seconds:duration,p_exercises:exercises.map(item=>({name:item.name,sets:item.sets,dose:item.dose,actual_reps:item.actualReps,weight_kg:item.weightKg,rir:item.rir})),p_difficulty:"正合适",p_completed_on:localDate()});if(error||!data)throw error??new Error("Workout session was not created");return data as string}catch{return enqueueSync({kind:"workout",userId,payload})}
 }
 
 export async function updateWorkoutFeedback(userId:string,sessionId:string,difficulty:string) {
@@ -121,7 +126,7 @@ export async function updateWorkoutFeedback(userId:string,sessionId:string,diffi
 export async function saveExtraActivity(userId:string,item:{name:string;amount:string;effort:string}) {
   if(typeof navigator!=="undefined"&&!navigator.onLine){const id=enqueueSync({kind:"extra",userId,payload:item});return {id,completed_at:new Date().toISOString()}}
   const {data,error}=await supabase.from("extra_activities").insert({user_id:userId,activity_name:item.name,amount:item.amount,effort:item.effort}).select("id,completed_at").single();
-  if(error)throw error;
+  if(error){const id=enqueueSync({kind:"extra",userId,payload:item});return {id,completed_at:new Date().toISOString()}}
   return data;
 }
 
@@ -135,56 +140,60 @@ export async function deleteExtraActivity(userId:string,id:string) {
 export async function saveBodyAndProfile(userId:string,input:{weight:number;waist:number;sleep:number;water:number;equipment:string[];reminderEnabled:boolean}) {
   if(typeof navigator!=="undefined"&&!navigator.onLine){enqueueSync({kind:"body",userId,payload:input});return}
   const {error}=await supabase.from("body_logs").upsert({user_id:userId,logged_on:localDate(),weight_kg:input.weight,waist_cm:input.waist,sleep_hours:input.sleep,water_cups:input.water},{onConflict:"user_id,logged_on"});
-  if(error)throw error;
+  if(error){enqueueSync({kind:"body",userId,payload:input});return}
   const {error:profileError}=await supabase.from("profiles").update({current_weight_kg:input.weight,equipment:input.equipment,reminder_enabled:input.reminderEnabled}).eq("id",userId);
-  if(profileError)throw profileError;
+  if(profileError){enqueueSync({kind:"settings",userId,payload:{equipment:input.equipment,reminderEnabled:input.reminderEnabled}})}
 }
 
 export async function saveProfileSettings(userId:string,input:{equipment:string[];reminderEnabled:boolean}) {
   if(typeof navigator!=="undefined"&&!navigator.onLine){enqueueSync({kind:"settings",userId,payload:input});return}
   const {error}=await supabase.from("profiles").update({equipment:input.equipment,reminder_enabled:input.reminderEnabled}).eq("id",userId);
-  if(error)throw error;
+  if(error)enqueueSync({kind:"settings",userId,payload:input});
 }
 
 export async function saveUserPreferences(userId:string,input:{healthLimitations:string[];preferences:AppPreferences}) {
+  if(typeof navigator!=="undefined"&&!navigator.onLine){enqueueSync({kind:"preferences",userId,payload:input});return}
   const {error}=await supabase.from("profiles").update({health_limitations:input.healthLimitations,preferences:input.preferences}).eq("id",userId);
-  if(error)throw error;
+  if(error)enqueueSync({kind:"preferences",userId,payload:input});
 }
 
 export async function saveTrainingGoal(userId:string,goal:string) {
+  if(typeof navigator!=="undefined"&&!navigator.onLine){enqueueSync({kind:"goal",userId,payload:{goal}});return}
   const {error}=await supabase.from("profiles").update({goal}).eq("id",userId);
-  if(error)throw error;
+  if(error)enqueueSync({kind:"goal",userId,payload:{goal}});
 }
 
 export async function saveTrainingProfile(userId:string,trainingProfile:TrainingProfile) {
+  if(typeof navigator!=="undefined"&&!navigator.onLine){enqueueSync({kind:"training-profile",userId,payload:{trainingProfile}});return}
   const {error}=await supabase.from("profiles").update({training_profile:trainingProfile,goal:trainingProfile.primaryGoal}).eq("id",userId);
-  if(error)throw error;
+  if(error)enqueueSync({kind:"training-profile",userId,payload:{trainingProfile}});
 }
 
 export async function loadTrainingProfile(userId:string) {
   const {data,error}=await supabase.from("profiles").select("training_profile").eq("id",userId).maybeSingle();
-  if(error)throw error;
+  if(error)return readDashboardCache(userId)?.trainingProfile;
   return (data?.training_profile as TrainingProfile|null)??undefined;
 }
 
 export async function deleteBodyLog(userId:string,date:string) {
+  if(typeof navigator!=="undefined"&&!navigator.onLine){enqueueSync({kind:"delete-body",userId,payload:{date}});return}
   const {error}=await supabase.from("body_logs").delete().eq("user_id",userId).eq("logged_on",date);
-  if(error)throw error;
+  if(error)enqueueSync({kind:"delete-body",userId,payload:{date}});
 }
 
 export async function saveNotificationPreferences(userId:string,input:NotificationPreference) {
   if(typeof navigator!=="undefined"&&!navigator.onLine){enqueueSync({kind:"notifications",userId,payload:input});return}
   const {error}=await supabase.from("notification_preferences").upsert({user_id:userId,enabled:input.enabled,training_days:input.days,training_time:input.time,advance_minutes:input.advanceMinutes},{onConflict:"user_id"});
-  if(error)throw error;
+  if(error)enqueueSync({kind:"notifications",userId,payload:input});
 }
 
 export async function saveDailyReadiness(userId:string,input:ReadinessInput,result:ReadinessRecommendation) {
   if(typeof navigator!=="undefined"&&!navigator.onLine){enqueueSync({kind:"readiness",userId,payload:{input,result}});return}
   const {error}=await supabase.from("daily_checkins").upsert({user_id:userId,checked_on:localDate(),sleep_hours:input.sleepHours,energy:input.energy,soreness:input.soreness,mood:input.mood,available_minutes:input.availableMinutes,sore_areas:input.soreAreas,readiness_score:result.score,recommendation:result},{onConflict:"user_id,checked_on"});
-  if(error)throw error;
+  if(error)enqueueSync({kind:"readiness",userId,payload:{input,result}});
 }
 
-type SyncOperation = { id:string; kind:"workout"|"feedback"|"extra"|"delete-extra"|"body"|"settings"|"notifications"|"readiness"; userId:string; payload:unknown };
+type SyncOperation = { id:string; kind:"workout"|"feedback"|"extra"|"delete-extra"|"body"|"settings"|"preferences"|"goal"|"training-profile"|"delete-body"|"notifications"|"readiness"; userId:string; payload:unknown };
 const queueKey="forma-sync-queue-v1";
 const readQueue=():SyncOperation[]=>{try{return JSON.parse(localStorage.getItem(queueKey)??"[]")}catch{return[]}};
 const writeQueue=(queue:SyncOperation[])=>localStorage.setItem(queueKey,JSON.stringify(queue));
@@ -206,10 +215,16 @@ export async function flushSyncQueue(userId:string){
       }else if(operation.kind==="feedback"){const {error}=await supabase.from("workout_sessions").update({difficulty:p.difficulty}).eq("id",p.sessionId).eq("user_id",userId);if(error)throw error;
       }else if(operation.kind==="extra"){const {error}=await supabase.from("extra_activities").insert({user_id:userId,activity_name:p.name,amount:p.amount,effort:p.effort});if(error)throw error;
       }else if(operation.kind==="delete-extra"){const {error}=await supabase.from("extra_activities").delete().eq("id",p.id).eq("user_id",userId);if(error)throw error;
-      }else if(operation.kind==="body"){await saveBodyAndProfile(userId,p as Parameters<typeof saveBodyAndProfile>[1]);
-      }else if(operation.kind==="settings"){await saveProfileSettings(userId,p as Parameters<typeof saveProfileSettings>[1]);
-      }else if(operation.kind==="notifications"){await saveNotificationPreferences(userId,p as NotificationPreference);
-      }else if(operation.kind==="readiness"){await saveDailyReadiness(userId,p.input as ReadinessInput,p.result as ReadinessRecommendation)}
+      }else if(operation.kind==="body"){
+        const {error}=await supabase.from("body_logs").upsert({user_id:userId,logged_on:localDate(),weight_kg:p.weight,waist_cm:p.waist,sleep_hours:p.sleep,water_cups:p.water},{onConflict:"user_id,logged_on"});if(error)throw error;
+        const {error:profileError}=await supabase.from("profiles").update({current_weight_kg:p.weight,equipment:p.equipment,reminder_enabled:p.reminderEnabled}).eq("id",userId);if(profileError)throw profileError;
+      }else if(operation.kind==="settings"){const {error}=await supabase.from("profiles").update({equipment:p.equipment,reminder_enabled:p.reminderEnabled}).eq("id",userId);if(error)throw error;
+      }else if(operation.kind==="preferences"){const {error}=await supabase.from("profiles").update({health_limitations:p.healthLimitations,preferences:p.preferences}).eq("id",userId);if(error)throw error;
+      }else if(operation.kind==="goal"){const {error}=await supabase.from("profiles").update({goal:p.goal}).eq("id",userId);if(error)throw error;
+      }else if(operation.kind==="training-profile"){const trainingProfile=p.trainingProfile as TrainingProfile;const {error}=await supabase.from("profiles").update({training_profile:trainingProfile,goal:trainingProfile.primaryGoal}).eq("id",userId);if(error)throw error;
+      }else if(operation.kind==="delete-body"){const {error}=await supabase.from("body_logs").delete().eq("user_id",userId).eq("logged_on",p.date);if(error)throw error;
+      }else if(operation.kind==="notifications"){const preference=p as NotificationPreference;const {error}=await supabase.from("notification_preferences").upsert({user_id:userId,enabled:preference.enabled,training_days:preference.days,training_time:preference.time,advance_minutes:preference.advanceMinutes},{onConflict:"user_id"});if(error)throw error;
+      }else if(operation.kind==="readiness"){const input=p.input as ReadinessInput;const result=p.result as ReadinessRecommendation;const {error}=await supabase.from("daily_checkins").upsert({user_id:userId,checked_on:localDate(),sleep_hours:input.sleepHours,energy:input.energy,soreness:input.soreness,mood:input.mood,available_minutes:input.availableMinutes,sore_areas:input.soreAreas,readiness_score:result.score,recommendation:result},{onConflict:"user_id,checked_on"});if(error)throw error}
       removeQueued(operation.id);
     }catch{break}
   }

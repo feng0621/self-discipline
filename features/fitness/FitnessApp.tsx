@@ -7,7 +7,6 @@ import AuthPanel from "../auth/components/AuthPanel";
 import LandingPage from "../landing/LandingPage";
 import ReadinessCard from "./components/ReadinessCard";
 import PersonalizedPlan from "./components/PersonalizedPlan";
-import Starfield from "./components/Starfield";
 import FormaIcon from "../../shared/icons/FormaIcon";
 import type { ReadinessInput, ReadinessRecommendation } from "./domain/adaptive-training";
 import { exercises, quickStages } from "./domain/workout-catalog";
@@ -18,7 +17,7 @@ import { supabase } from "../../infrastructure/supabase/client";
 
 export default function FitnessApp(){
   const [user,setUser]=useState<User|null>(null);
-  const [authReady,setAuthReady]=useState(true);
+  const [authReady,setAuthReady]=useState(false);
   const [demoMode,setDemoMode]=useState(false);
   const [showLanding,setShowLanding]=useState(true);
   const [cloudState,setCloudState]=useState<"idle"|"saving"|"synced"|"error">("idle");
@@ -77,11 +76,13 @@ export default function FitnessApp(){
   const [goal,setGoal]=useState("减脂 · 腹肌显形");
   const [trainingProfile,setTrainingProfile]=useState<TrainingProfile|undefined>();
   const [workoutPaused,setWorkoutPaused]=useState(false);
+  const [elapsedSeconds,setElapsedSeconds]=useState(0);
 
   useEffect(()=>{
-    supabase.auth.getUser().then(({data})=>{setUser(data.user);setAuthReady(true)});
+    let active=true;
+    supabase.auth.getSession().then(({data})=>{if(!active)return;setUser(data.session?.user??null);setAuthReady(true)}).catch(()=>{if(active)setAuthReady(true)});
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{setUser(session?.user??null);setAuthReady(true)});
-    return()=>subscription.unsubscribe();
+    return()=>{active=false;subscription.unsubscribe()};
   },[]);
   useEffect(()=>{const open=()=>{setDemoMode(true);setShowLanding(false);setTab("训练");setWorkoutOpen(true);setSessionStartedAt(Date.now())};if(new URLSearchParams(location.search).get("start")==="training")queueMicrotask(open);navigator.serviceWorker?.addEventListener("message",event=>{if(event.data?.type==="OPEN_TODAY_WORKOUT")open()})},[]);
   useEffect(()=>{
@@ -116,9 +117,9 @@ export default function FitnessApp(){
     window.addEventListener("online",sync);return()=>window.removeEventListener("online",sync);
   },[user]);
 
-  useEffect(()=>{queueMicrotask(()=>{try{const raw=localStorage.getItem("forma-active-workout-v1");if(!raw)return;const saved=JSON.parse(raw);setDone(saved.done??[]);setSwapped(saved.swapped??[]);setIntensity(saved.intensity??"入门");setActiveExercise(saved.activeExercise??0);setSetsCompleted(saved.setsCompleted??0);setTimerMode(saved.timerMode??"rest");setRestTotal(saved.restTotal??75);setQuickRecorded(saved.quickRecorded??false);setWorkoutPaused(Boolean(saved.workoutPaused));if(saved.deadline&&saved.running){const remaining=Math.max(0,Math.ceil((saved.deadline-Date.now())/1000));setSeconds(remaining);setTimerDeadline(saved.deadline);setRunning(remaining>0)}else setSeconds(saved.seconds??75);setWorkoutOpen(Boolean(saved.workoutOpen));setTimer(Boolean(saved.timer))}catch{/* Ignore stale session data. */}})},[]);
-  useEffect(()=>{if(!workoutOpen&&!timer&&!workoutPaused){localStorage.removeItem("forma-active-workout-v1");return}localStorage.setItem("forma-active-workout-v1",JSON.stringify({workoutOpen,timer,workoutPaused,activeExercise,setsCompleted,done,swapped,intensity,timerMode,restTotal,seconds:secondsRef.current,running,deadline:timerDeadline,quickRecorded}));lastTimerPersist.current=Date.now()},[workoutOpen,timer,workoutPaused,activeExercise,setsCompleted,done,swapped,intensity,timerMode,restTotal,running,timerDeadline,quickRecorded]);
-  useEffect(()=>{if(!workoutOpen&&!timer)return;if(running&&Date.now()-lastTimerPersist.current<10000)return;localStorage.setItem("forma-active-workout-v1",JSON.stringify({workoutOpen,timer,activeExercise,setsCompleted,done,swapped,intensity,timerMode,restTotal,seconds,running,deadline:timerDeadline,quickRecorded}));lastTimerPersist.current=Date.now()},[seconds,workoutOpen,timer,running,activeExercise,setsCompleted,done,swapped,intensity,timerMode,restTotal,timerDeadline,quickRecorded]);
+  useEffect(()=>{queueMicrotask(()=>{try{const raw=localStorage.getItem("forma-active-workout-v1");if(!raw)return;const saved=JSON.parse(raw);setDone(saved.done??[]);setSwapped(saved.swapped??[]);setIntensity(saved.intensity??"入门");setActiveExercise(saved.activeExercise??0);setSetsCompleted(saved.setsCompleted??0);setTimerMode(saved.timerMode??"rest");setRestTotal(saved.restTotal??75);setQuickRecorded(saved.quickRecorded??false);setWorkoutPaused(Boolean(saved.workoutPaused));setSessionStartedAt(saved.sessionStartedAt??Date.now());if(saved.deadline&&saved.running){const remaining=Math.max(0,Math.ceil((saved.deadline-Date.now())/1000));setSeconds(remaining);setTimerDeadline(saved.deadline);setRunning(remaining>0)}else setSeconds(saved.seconds??75);setWorkoutOpen(Boolean(saved.workoutOpen));setTimer(Boolean(saved.timer))}catch{/* Ignore stale session data. */}})},[]);
+  useEffect(()=>{if(!workoutOpen&&!timer&&!workoutPaused){localStorage.removeItem("forma-active-workout-v1");return}localStorage.setItem("forma-active-workout-v1",JSON.stringify({workoutOpen,timer,workoutPaused,sessionStartedAt,activeExercise,setsCompleted,done,swapped,intensity,timerMode,restTotal,seconds:secondsRef.current,running,deadline:timerDeadline,quickRecorded}));lastTimerPersist.current=Date.now()},[workoutOpen,timer,workoutPaused,sessionStartedAt,activeExercise,setsCompleted,done,swapped,intensity,timerMode,restTotal,running,timerDeadline,quickRecorded]);
+  useEffect(()=>{if(!workoutOpen&&!timer)return;if(running&&Date.now()-lastTimerPersist.current<10000)return;localStorage.setItem("forma-active-workout-v1",JSON.stringify({workoutOpen,timer,sessionStartedAt,activeExercise,setsCompleted,done,swapped,intensity,timerMode,restTotal,seconds,running,deadline:timerDeadline,quickRecorded}));lastTimerPersist.current=Date.now()},[seconds,workoutOpen,timer,sessionStartedAt,running,activeExercise,setsCompleted,done,swapped,intensity,timerMode,restTotal,timerDeadline,quickRecorded]);
   useEffect(()=>{const resume=()=>{if(running&&timerDeadline)setSeconds(Math.max(0,Math.ceil((timerDeadline-Date.now())/1000)))};document.addEventListener("visibilitychange",resume);window.addEventListener("focus",resume);return()=>{document.removeEventListener("visibilitychange",resume);window.removeEventListener("focus",resume)}},[running,timerDeadline]);
 
   useEffect(()=>{
@@ -135,6 +136,7 @@ export default function FitnessApp(){
   },[notificationPrefs]);
 
   useEffect(()=>{if(!running)return;const id=window.setInterval(()=>setSeconds(v=>{if(v<=1){setRunning(false);if(workoutOpen&&timerMode==="rest")setTimer(false);return 0}return v-1}),1000);return()=>window.clearInterval(id)},[running,workoutOpen,timerMode]);
+  useEffect(()=>{if(!workoutOpen||!sessionStartedAt)return;const update=()=>setElapsedSeconds(Math.max(0,Math.floor((Date.now()-sessionStartedAt)/1000)));update();const id=window.setInterval(update,1000);return()=>window.clearInterval(id)},[workoutOpen,sessionStartedAt]);
   useEffect(()=>{const locked=workoutOpen||timer||guide!==null||extraOpen;document.documentElement.classList.toggle("overlayLocked",locked);return()=>document.documentElement.classList.remove("overlayLocked")},[workoutOpen,timer,guide,extraOpen]);
   const activeExercises=useMemo(()=>exercises.map((x,i)=>{
     if(intensity==="入门")return {...x,sets:3,dose:i===4?"3 × 20秒":i===3?"3 × 12":`3 × ${i===1?10:8}`,rest:75};
@@ -158,6 +160,7 @@ export default function FitnessApp(){
   const quickStageIndex=Math.min(quickStages.findIndex(s=>{quickCursor+=s.duration;return quickElapsed<quickCursor}),quickStages.length-1);
   const safeQuickIndex=quickStageIndex<0?quickStages.length-1:quickStageIndex;
   const clock=`${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;
+  const elapsedClock=`${String(Math.floor(elapsedSeconds/60)).padStart(2,"0")}:${String(elapsedSeconds%60).padStart(2,"0")}`;
   const toggle=(i:number)=>setDone(v=>v.includes(i)?v.filter(x=>x!==i):[...v,i]);
   const beginRest=(value:number)=>{setRestTotal(value);setTimerMode("rest");setSeconds(value);setTimerDeadline(Date.now()+value*1000);setRunning(true);setTimer(true)};
   const refreshSyncState=()=>{const count=pendingSyncCount();setPendingSync(count);setCloudState(count?"error":"synced")};
@@ -196,16 +199,14 @@ export default function FitnessApp(){
 
   if(!authReady)return <main className="bootScreen"><span>FORMA°</span><i/></main>;
   if(!user&&!demoMode&&showLanding)return <LandingPage onEnterDemo={()=>setDemoMode(true)} onLogin={()=>setShowLanding(false)}/>;
-  if(!user&&!demoMode)return <><Starfield/><AuthPanel onContinueDemo={()=>setDemoMode(true)} onBack={()=>setShowLanding(true)}/></>;
+  if(!user&&!demoMode)return <AuthPanel onContinueDemo={()=>setDemoMode(true)} onBack={()=>setShowLanding(true)}/>;
 
   return <main className="app">
-    <Starfield intensity={intensity==="强化"?1.4:1}/>
-    <div className="nebulaField" aria-hidden="true"/>
     <aside className="rail"><span>FORMA / 12</span><i/><small>110.0 KG</small></aside>
     <header className="nav">
       <button className="wordmark">FORMA<span>°</span></button>
       <div className="navCenter"><b>W02</b><span>十二周重塑计划</span></div>
-      <button className="cloudStatus" data-state={cloudState} onClick={()=>void retrySync()} aria-label="重试数据同步"><i/>{user?(pendingSync?`${pendingSync} 项待同步`:cloudState==="saving"?"同步中":cloudState==="error"?"点击重试":"云端已连接"):"本机保存"}</button>
+      <button className="cloudStatus" data-state={cloudState} data-pending={pendingSync>0} onClick={()=>void retrySync()} aria-label="重试数据同步"><i/>{user?(pendingSync?`已存本机 · ${pendingSync} 项待同步`:cloudState==="saving"?"同步中":cloudState==="error"?"点击重试":"云端已连接"):"本机保存"}</button>
       <button className="profile" onClick={()=>user?void supabase.auth.signOut():(setDemoMode(false),setShowLanding(false))} aria-label={user?"退出登录":"进入登录"}>{user?.email?.[0]?.toUpperCase()??"J"}</button>
     </header>
 
@@ -321,11 +322,12 @@ export default function FitnessApp(){
     {extraOpen&&<div className="extraOverlay" role="dialog" aria-modal="true"><form className="extraSheet" onSubmit={e=>{e.preventDefault();addExtra()}}><div className="extraTop"><div><p className="kicker">MANUAL LOG</p><h2>添加额外训练</h2></div><button type="button" onClick={()=>setExtraOpen(false)}>×</button></div><label>运动项目<input autoFocus value={extraName} onChange={e=>setExtraName(e.target.value)} placeholder="例如：快走、游泳、骑车"/></label><div className="extraPresets">{["快走","骑车","游泳","爬楼梯","额外力量"].map(x=><button type="button" className={extraName===x?"active":""} onClick={()=>setExtraName(x)} key={x}>{x}</button>)}</div><label>完成量<input value={extraAmount} onChange={e=>setExtraAmount(e.target.value)} placeholder="例如：30 分钟或 3组 × 12次"/></label><div className="effortPick"><small>体感强度</small>{["轻松","适中","吃力"].map(x=><button type="button" className={extraEffort===x?"active":""} onClick={()=>setExtraEffort(x)} key={x}>{x}</button>)}</div><button className="saveExtra">保存到今天 <b>→</b></button></form></div>}
 
     {workoutOpen&&<div className="workoutOverlay" role="dialog" aria-modal="true"><div className="workoutSheet">
-      <div className="workoutTop"><div><p className="kicker">{intensity}训练 · {activeExercise+1}/{activeExercises.length}</p><h2>专注这一组。</h2></div><button onClick={()=>setExitConfirm(true)}>×</button></div>
+      <div className="workoutTop"><div><p className="kicker">{intensity}训练 · 动作 {activeExercise+1}/{activeExercises.length}</p><h2>专注这一组。</h2></div><span className="sessionClock"><small>训练用时</small><b>{elapsedClock}</b></span><button onClick={()=>setExitConfirm(true)} aria-label="暂停或退出训练">×</button></div>
       <div className="workoutProgress"><i style={{width:`${((activeExercise+setsCompleted/activeExercises[activeExercise].sets)/activeExercises.length)*100}%`}}/></div>
+      <div className="workoutMetrics"><span><small>当前组</small><b>{setsCompleted+1} / {activeExercises[activeExercise].sets}</b></span><span><small>目标训练量</small><b>{activeExercises[activeExercise].dose}</b></span><span><small>组间休息</small><b>{activeExercises[activeExercise].rest} 秒</b></span></div>
       <button className="workoutMedia" onClick={()=>setGuide(activeExercise)}><img src={`https://i.ytimg.com/vi/${activeExercises[activeExercise].videoId}/hqdefault.jpg`} alt="" decoding="async" width="640" height="390"/><span>▶ 查看动作基础教学</span></button>
       <div className="workoutInfo"><small>{activeExercises[activeExercise].target}</small><h3>{effectiveSwapped.includes(activeExercise)?["墙壁俯卧撑","箱式深蹲","坐姿弹力带划船","蛙式臀桥","高位平板支撑"][activeExercise]:activeExercises[activeExercise].name}</h3>{autoSwapped.includes(activeExercise)&&<p className="swapReason">因你的不适部位，已自动换成低负担动作。</p>}<p>{activeExercises[activeExercise].cue}</p><div className="setDots">{Array.from({length:activeExercises[activeExercise].sets},(_,i)=><span className={i<setsCompleted?"done":i===setsCompleted?"current":""} key={i}>{i<setsCompleted?"✓":i+1}<small>第{i+1}组</small></span>)}</div><div className="performanceInputs"><label>实际次数<input inputMode="numeric" value={performance[activeExercise]?.reps??""} onChange={e=>setPerformance(v=>({...v,[activeExercise]:{reps:e.target.value,weight:v[activeExercise]?.weight??"",rir:v[activeExercise]?.rir??""}}))}/></label><label>重量 {preferences.unit==="metric"?"kg":"lb"}<input inputMode="decimal" value={performance[activeExercise]?.weight??""} onChange={e=>setPerformance(v=>({...v,[activeExercise]:{reps:v[activeExercise]?.reps??"",weight:e.target.value,rir:v[activeExercise]?.rir??""}}))}/></label><label>余力 RIR<input inputMode="numeric" value={performance[activeExercise]?.rir??""} onChange={e=>setPerformance(v=>({...v,[activeExercise]:{reps:v[activeExercise]?.reps??"",weight:v[activeExercise]?.weight??"",rir:e.target.value}}))}/></label></div><div className="lastResult"><span>本档训练量</span><b>{activeExercises[activeExercise].dose} · 休息 {activeExercises[activeExercise].rest} 秒</b></div><div className="workoutActions"><button onClick={previousSet} disabled={activeExercise===0&&setsCompleted===0}>← 上一步</button><button onClick={skipExercise}>跳过动作</button></div><button className="finishSet" onClick={finishSet}>完成第 {setsCompleted+1} 组 <b>→</b></button></div>
-      {timer&&timerMode==="rest"&&<div className="inlineRest"><p className="kicker">组间休息 · 下一组即将开始</p><strong>{clock}</strong><span>放松肩膀，保持缓慢呼吸</span><div className="restBar"><i style={{width:`${Math.max(0,100-seconds/restTotal*100)}%`}}/></div><button onClick={()=>{setTimer(false);setRunning(false);setTimerDeadline(null)}}>跳过休息，继续训练 →</button></div>}
+      {timer&&timerMode==="rest"&&<div className="inlineRest"><p className="kicker">{setsCompleted>0?`休息中 · 第 ${setsCompleted} 组已完成`:"动作间休息"}</p><strong>{clock}</strong><span>放松肩膀，保持缓慢呼吸</span><div className="restBar"><i style={{width:`${Math.max(0,100-seconds/restTotal*100)}%`}}/></div><div className="restAdjust"><button onClick={()=>adjustTimer(-15)}>−15 秒</button><button className="restPause" onClick={toggleTimer}>{running?"暂停":"继续"}</button><button onClick={()=>adjustTimer(15)}>+15 秒</button></div><div className="nextUp"><small>接下来</small><b>{`${effectiveSwapped.includes(activeExercise)?["墙壁俯卧撑","箱式深蹲","坐姿弹力带划船","蛙式臀桥","高位平板支撑"][activeExercise]:activeExercises[activeExercise].name} · 第 ${setsCompleted+1} 组`}</b></div><button className="skipRest" onClick={()=>{setTimer(false);setRunning(false);setTimerDeadline(null)}}>结束休息，继续训练 →</button></div>}
     </div></div>}
 
     {guide!==null&&<div className="modal" role="dialog" aria-modal="true">
